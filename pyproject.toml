@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "DuplicateImageFinder"
+version = "0.1.0"
+description = ""
+authors = ["Rendy Arya Kemal <rendyarya22@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+ImageHash = "^4.2.0"
+Pillow = "^8.2.0"
+tqdm = "^4.61.1"
+PyQt5 = "^5.15.4"
+qt-material = "^2.8.8"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+mypy = "^0.902"
+flake8 = "^3.9.2"
+black = "^21.6b0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
