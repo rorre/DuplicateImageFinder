@@ -1,13 +1,14 @@
+from collections import defaultdict
 import mimetypes
 import os
 import pathlib
-from typing import Callable, Dict, List, Union
+from typing import Callable, Dict, List, Optional, Union
 
 import imagehash
 from PIL import Image
 
 Path = Union[str, pathlib.Path]
-FileHashes = Dict[str, List[Path]]
+FileHashes = Dict[Path, List[Path]]
 
 
 def get_all_images(folder: Path) -> List[Path]:
@@ -27,26 +28,49 @@ def get_all_images(folder: Path) -> List[Path]:
     return image_paths
 
 
-def find_duplicates(
+def get_hashes(
     image_paths: List[Path],
     increment_func: Callable = None,
-) -> FileHashes:
-    """Find duplicates from list of images."""
-    hashes: FileHashes = {}
-
+) -> Dict[Path, Optional[imagehash.ImageHash]]:
+    hashes: Dict[Path, Optional[imagehash.ImageHash]] = {}
     for file_path in image_paths:
         try:
             with Image.open(file_path) as im:
-                hash_value = str(imagehash.phash(im))
-                if hash_value in hashes:
-                    hashes[hash_value].append(file_path)
-                else:
-                    hashes[hash_value] = [file_path]
+                hashes[file_path] = imagehash.phash(im, hash_size=128)
         except:
-            continue
+            hashes[file_path] = None
 
         if increment_func:
             increment_func()
 
-    final_hashes = {k: v for k, v in hashes.items() if len(v) > 1}
+    return hashes
+
+
+def find_duplicates(
+    image_paths: List[Path],
+    hashes: Dict[Path, Optional[imagehash.ImageHash]],
+    increment_func: Callable = None,
+) -> FileHashes:
+    """Find duplicates from list of images."""
+    dups: FileHashes = defaultdict(list)
+
+    for base in image_paths:
+        base_hash = hashes[base]
+        if not base_hash:
+            if increment_func:
+                increment_func()
+            continue
+
+        for target in image_paths:
+            target_hash = hashes[target]
+            if not target_hash:
+                continue
+
+            if (base_hash - target_hash) / (8**2) < 0.2:
+                dups[base].append(target)
+
+        if increment_func:
+            increment_func()
+
+    final_hashes = {k: v for k, v in dups.items() if len(v) > 1}
     return final_hashes
