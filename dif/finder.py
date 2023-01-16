@@ -54,14 +54,17 @@ def find_duplicates(
     """Find duplicates from list of images."""
     dups: FileHashes = defaultdict(list)
 
-    for base in image_paths:
+    img_len = len(image_paths)
+    for i in range(img_len):
+        base = image_paths[i]
         base_hash = hashes[base]
         if not base_hash:
             if increment_func:
                 increment_func()
             continue
 
-        for target in image_paths:
+        for j in range(i + 1, img_len):
+            target = image_paths[j]
             target_hash = hashes[target]
             if not target_hash:
                 continue
