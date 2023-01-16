@@ -23,7 +23,7 @@ from PyQt5.QtWidgets import (
 )
 from qt_material import apply_stylesheet
 
-from dif.finder import FileHashes, find_duplicates, get_all_images
+from dif.finder import FileHashes, find_duplicates, get_all_images, get_hashes
 
 
 def isValidFolder(folder):
@@ -53,7 +53,14 @@ class DuplicateWorker(QThread):
     def run(self):
         imagePaths = get_all_images(self._folder)
         self.totalImages.emit(len(imagePaths))
-        self.duplicateImages.emit(find_duplicates(imagePaths, self._updateProgress))
+
+        hashes = get_hashes(imagePaths, self._updateProgress)
+        self._progress = 0
+        self.progress.emit(0)
+
+        self.duplicateImages.emit(
+            find_duplicates(imagePaths, hashes, self._updateProgress)
+        )
 
 
 class ImagePopup(QWidget):
@@ -290,7 +297,8 @@ class Window(QMainWindow):
     def createProgressBar(self):
         """Creates and configures the progress bar."""
         self.progressBar = QProgressBar()
-        self.progressBar.setTextVisible(False)
+        self.progressBar.setTextVisible(True)
+        self.progressBar.setFormat("%p% (%v/%m)")
 
     def createDuplicateImageArea(self):
         """Creates duplicate image result area."""
@@ -307,7 +315,7 @@ class Window(QMainWindow):
 
 def run(args):
     app = QApplication(args)
-    apply_stylesheet(app, theme="dark_blue.xml")
+    # apply_stylesheet(app, theme="dark_blue.xml")
     win = Window()
     win.show()
     app.exec_()
