@@ -1,3 +1,4 @@
+import functools
 import os
 from pathlib import Path
 from typing import Set
@@ -70,7 +71,7 @@ class DuplicateWorker(QThread):
                 imagePaths,
                 hashes,
                 self._hashSize,
-                self._threshold,
+                (1 - self._threshold),
                 increment_func=self._updateProgress,
             )
         )
@@ -265,6 +266,26 @@ class Window(QMainWindow):
             )
             self.progressBar.reset()
             return
+
+        total = functools.reduce(lambda x, y: x + len(y), duplicates.values(), 0)
+        total += len(duplicates)
+
+        if total > 100:
+            result = QMessageBox.warning(
+                self,
+                "Big result size",
+                f"There is a lot of images detected for duplicate ({total}), are you sure to show them?",
+                QMessageBox.Ok | QMessageBox.Cancel,
+                QMessageBox.Ok,
+            )
+
+            if result != QMessageBox.Ok:
+                self.imagesLayout.addWidget(
+                    QLabel("Cancelled."),
+                    alignment=Qt.AlignCenter,
+                )
+                self.progressBar.reset()
+                return
 
         for hashName, fileNames in duplicates.items():
             imageFrame = QGroupBox(hashName)
