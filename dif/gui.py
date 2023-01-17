@@ -23,7 +23,7 @@ from PyQt5.QtWidgets import (
 )
 from qt_material import apply_stylesheet
 
-from dif.finder import FileHashes, find_duplicates, get_all_images, get_hashes
+from dif.finder import FileDuplicates, find_duplicates, get_all_images, get_hashes
 
 
 def isValidFolder(folder):
@@ -232,7 +232,7 @@ class Window(QMainWindow):
         for i in reversed(range(layout.count())):
             layout.itemAt(i).widget().setParent(None)
 
-    def showDuplicateImages(self, duplicates: FileHashes):
+    def showDuplicateImages(self, duplicates: FileDuplicates):
         """Show all result from duplicate image worker.
 
         This is running in the same thread as UI, so on big result we might experience lag."""

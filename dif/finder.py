@@ -6,9 +6,12 @@ from typing import Callable, Dict, List, Optional, Union
 
 import imagehash
 from PIL import Image
+import numpy as np
+import numpy.typing as npt
 
 Path = Union[str, pathlib.Path]
-FileHashes = Dict[Path, List[Path]]
+FileHashes = Dict[Path, Optional[npt.NDArray[np.bool_]]]
+FileDuplicates = Dict[Path, List[Path]]
 
 
 def get_all_images(folder: Path) -> List[Path]:
@@ -31,12 +34,12 @@ def get_all_images(folder: Path) -> List[Path]:
 def get_hashes(
     image_paths: List[Path],
     increment_func: Callable = None,
-) -> Dict[Path, Optional[imagehash.ImageHash]]:
-    hashes: Dict[Path, Optional[imagehash.ImageHash]] = {}
+) -> FileHashes:
+    hashes: FileHashes = {}
     for file_path in image_paths:
         try:
             with Image.open(file_path) as im:
-                hashes[file_path] = imagehash.phash(im, hash_size=128)
+                hashes[file_path] = imagehash.phash(im, hash_size=128).hash.flatten()
         except:
             hashes[file_path] = None
 
@@ -48,17 +51,17 @@ def get_hashes(
 
 def find_duplicates(
     image_paths: List[Path],
-    hashes: Dict[Path, Optional[imagehash.ImageHash]],
+    hashes: FileHashes,
     increment_func: Callable = None,
-) -> FileHashes:
+) -> FileDuplicates:
     """Find duplicates from list of images."""
-    dups: FileHashes = defaultdict(list)
+    dups: FileDuplicates = defaultdict(list)
 
     img_len = len(image_paths)
     for i in range(img_len):
         base = image_paths[i]
         base_hash = hashes[base]
-        if not base_hash:
+        if base_hash is None:
             if increment_func:
                 increment_func()
             continue
@@ -66,10 +69,10 @@ def find_duplicates(
         for j in range(i + 1, img_len):
             target = image_paths[j]
             target_hash = hashes[target]
-            if not target_hash:
+            if target_hash is None:
                 continue
 
-            if (base_hash - target_hash) / (8**2) < 0.2:
+            if np.count_nonzero(base_hash != target_hash) / (8**2) < 0.2:
                 dups[base].append(target)
 
         if increment_func:
