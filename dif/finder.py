@@ -33,13 +33,16 @@ def get_all_images(folder: Path) -> List[Path]:
 
 def get_hashes(
     image_paths: List[Path],
+    hash_size: int,
     increment_func: Callable = None,
 ) -> FileHashes:
     hashes: FileHashes = {}
     for file_path in image_paths:
         try:
             with Image.open(file_path) as im:
-                hashes[file_path] = imagehash.phash(im, hash_size=128).hash.flatten()
+                hashes[file_path] = imagehash.phash(
+                    im, hash_size=hash_size
+                ).hash.flatten()
         except:
             hashes[file_path] = None
 
@@ -52,6 +55,8 @@ def get_hashes(
 def find_duplicates(
     image_paths: List[Path],
     hashes: FileHashes,
+    hash_size: int,
+    threshold: float,
     increment_func: Callable = None,
 ) -> FileDuplicates:
     """Find duplicates from list of images."""
@@ -72,7 +77,10 @@ def find_duplicates(
             if target_hash is None:
                 continue
 
-            if np.count_nonzero(base_hash != target_hash) / (8**2) < 0.2:
+            if (
+                np.count_nonzero(base_hash != target_hash) / (hash_size**2)
+                < threshold
+            ):
                 dups[base].append(target)
 
         if increment_func:

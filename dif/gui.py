@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Set
 
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QPixmap, QDoubleValidator
 from PyQt5.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -20,6 +20,7 @@ from PyQt5.QtWidgets import (
     QScrollArea,
     QVBoxLayout,
     QWidget,
+    QComboBox,
 )
 from qt_material import apply_stylesheet
 
@@ -41,8 +42,10 @@ class DuplicateWorker(QThread):
     totalImages = pyqtSignal(int)
     duplicateImages = pyqtSignal(dict)
 
-    def __init__(self, folder: str, *args, **kwargs):
+    def __init__(self, folder: str, hashSize: int, threshold: float, *args, **kwargs):
         self._folder = folder
+        self._hashSize = hashSize
+        self._threshold = threshold
         super().__init__(*args, **kwargs)
 
     def _updateProgress(self):
@@ -54,12 +57,22 @@ class DuplicateWorker(QThread):
         imagePaths = get_all_images(self._folder)
         self.totalImages.emit(len(imagePaths))
 
-        hashes = get_hashes(imagePaths, self._updateProgress)
+        hashes = get_hashes(
+            imagePaths,
+            self._hashSize,
+            increment_func=self._updateProgress,
+        )
         self._progress = 0
         self.progress.emit(0)
 
         self.duplicateImages.emit(
-            find_duplicates(imagePaths, hashes, self._updateProgress)
+            find_duplicates(
+                imagePaths,
+                hashes,
+                self._hashSize,
+                self._threshold,
+                increment_func=self._updateProgress,
+            )
         )
 
 
@@ -132,6 +145,7 @@ class Window(QMainWindow):
         self.setWindowTitle("Duplicate Image Finder")
 
         # Create all the necessary layout and widgets.
+        self.createSensitivityRow()
         self.createFolderSelect()
         self.createProgressBar()
         self.createDuplicateImageArea()
@@ -143,7 +157,8 @@ class Window(QMainWindow):
         mainLayout = QGridLayout()
         mainLayout.addLayout(self.folderLayout, 0, 0)
         mainLayout.addWidget(self.progressBar, 1, 0)
-        mainLayout.addWidget(self.imagesScrollArea, 2, 0)
+        mainLayout.addLayout(self.sensitivityLayout, 2, 0)
+        mainLayout.addWidget(self.imagesScrollArea, 3, 0)
         mainLayout.addWidget(deleteButton, 4, 0)
 
         # QMainWindow cannot have layout as its central widget, so we wrap the layout
@@ -214,7 +229,10 @@ class Window(QMainWindow):
             alignment=Qt.AlignCenter,
         )
 
-        self.runningThread = DuplicateWorker(targetFolder)
+        threshold = float(self.thresholdWidget.text())
+        hashSize = int(self.hashSizeDropdown.currentText())
+
+        self.runningThread = DuplicateWorker(targetFolder, hashSize, threshold)
         self.runningThread.totalImages.connect(self.progressBar.setMaximum)
         self.runningThread.progress.connect(self.progressBar.setValue)
         self.runningThread.duplicateImages.connect(self.showDuplicateImages)
@@ -280,6 +298,24 @@ class Window(QMainWindow):
 
             imageFrame.setLayout(imageFrameLayout)
             self.imagesLayout.addWidget(imageFrame)
+
+    def createSensitivityRow(self):
+        hashSizeLabel = QLabel("Hash size:")
+        thresholdLabel = QLabel("Threshold:")
+
+        self.hashSizeDropdown = QComboBox()
+        self.hashSizeDropdown.addItems(["8", "16", "32", "64"])
+
+        validator = QDoubleValidator(0.0, 1.0, 2)
+        validator.setNotation(QDoubleValidator.StandardNotation)
+        self.thresholdWidget = QLineEdit("0.8")
+        self.thresholdWidget.setValidator(validator)
+
+        self.sensitivityLayout = QHBoxLayout()
+        self.sensitivityLayout.addWidget(hashSizeLabel)
+        self.sensitivityLayout.addWidget(self.hashSizeDropdown)
+        self.sensitivityLayout.addWidget(thresholdLabel)
+        self.sensitivityLayout.addWidget(self.thresholdWidget)
 
     def createFolderSelect(self):
         """Creates the folder selection layout."""
